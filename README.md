@@ -33,7 +33,24 @@ npm run dev                 # http://localhost:3000
 
 > As portas do Supabase local deste projeto ficam na faixa **553xx** (API em `http://127.0.0.1:55321`, Studio em `http://127.0.0.1:55323`) para não conflitar com outros projetos Supabase na mesma máquina.
 
-Para recriar o banco do zero (migrations + seed): `npx supabase db reset`.
+Para recriar o banco do zero (migrations + seed): `npx supabase db reset`. **Atenção:** isso apaga todos os dados cadastrados — faça um backup antes.
+
+### Backup e restauração dos dados locais
+
+Backup (fica em `backups/`, fora do git; não inclui a tabela `configuracoes`, que guarda as chaves de API):
+
+```bash
+ARQ="backups/dados-$(date +%Y-%m-%d_%H%M).sql"
+docker exec supabase_db_radar-concorrentes pg_dump -U postgres --data-only --column-inserts --schema=public --exclude-table=public.configuracoes > "$ARQ"
+docker exec supabase_db_radar-concorrentes pg_dump -U postgres --data-only --column-inserts --table=auth.users --table=auth.identities >> "$ARQ"
+```
+
+Restauração num banco vazio (as chaves de API precisam ser cadastradas de novo em Configurações):
+
+```bash
+npx supabase db reset --no-seed
+(echo "set session_replication_role = replica;"; cat backups/ARQUIVO.sql) | docker exec -i supabase_db_radar-concorrentes psql -U postgres
+```
 
 ### Testes
 
