@@ -153,8 +153,12 @@ export function FormConcorrente({
           alterados.push(campo);
         }
       }
-      if (!novos.fonte_dados.trim() && r.sugestao.citacoes.length > 0) {
-        const doms = [...new Set(r.sugestao.citacoes.map((c) => dominio(c.url)))].slice(0, 5);
+      // Páginas consultadas pela busca; se a busca não devolver a lista, usa as fontes de cada campo.
+      const urls = r.sugestao.citacoes.length > 0
+        ? r.sugestao.citacoes.map((c) => c.url)
+        : Object.values(r.sugestao.campos).flatMap((c) => (c.fonte ? [c.fonte] : []));
+      if (!novos.fonte_dados.trim() && urls.length > 0) {
+        const doms = [...new Set(urls.map(dominio))].slice(0, 5);
         novos.fonte_dados = `Pesquisa web em ${new Date().toLocaleDateString("pt-BR")}: ${doms.join(", ")}`;
       }
       setValores(novos);
@@ -231,6 +235,7 @@ export function FormConcorrente({
                 <li key={campo} className="py-2">
                   <span className="font-medium">{ROTULOS_CAMPOS[campo]}:</span> {s.valor}{" "}
                   {preenchidos.includes(campo) && <span className="text-xs text-azul-escuro">(preenchido)</span>}
+                  {s.obs && <span className="block text-xs text-texto-suave">{s.obs}</span>}
                   {s.fonte ? (
                     <a href={s.fonte} target="_blank" rel="noreferrer" className="block text-xs text-azul underline">
                       Fonte: {dominio(s.fonte)}

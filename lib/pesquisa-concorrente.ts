@@ -3,7 +3,7 @@ import { getOpenRouter } from "@/lib/config";
 import { conversar, ErroOpenRouter, extrairJson, type Citacao } from "@/lib/openrouter";
 import { TIPOS_FONTE, type TipoFonte } from "@/lib/rotulos";
 
-export type CampoPesquisado = { valor: string; fonte: string | null };
+export type CampoPesquisado = { valor: string; fonte: string | null; obs: string | null };
 
 export type SugestaoConcorrente = {
   campos: Partial<Record<CampoSugerido, CampoPesquisado>>;
@@ -30,6 +30,7 @@ const SISTEMA = `Você é um analista de inteligência competitiva no Brasil. Pe
 Regras:
 - Use apenas informações encontradas na pesquisa. Se não encontrar um dado com confiança, use null. Nunca invente.
 - Para cada campo, informe "fonte": a URL exata da página onde o dado foi encontrado.
+- "valor" deve ser CURTO e direto (no máximo 80 caracteres), sem explicações. Ressalvas, divergências entre fontes ou contexto vão em "obs" (opcional, até 200 caracteres).
 - Cuidado com empresas de nomes parecidos: confirme que é o software certo pelo segmento.
 - Não inclua dados pessoais de pessoas físicas.`;
 
@@ -53,11 +54,29 @@ Devolva exatamente este JSON (valores em português do Brasil):
     {"tipo": "${Object.keys(TIPOS_FONTE).join(" | ")}", "url": "URL da página de avaliações deste produto"}
   ]
 }
-Em "fontes_avaliacao", liste apenas páginas de avaliações que você realmente encontrou (Reclame Aqui, B2B Stack, Capterra, G2, Google Play, App Store).`;
+Cada campo pode ter também "obs" com ressalvas, ex.: {"valor": "51–200", "fonte": "url", "obs": "o site cita mais de 400"}.
+Em "fontes_avaliacao", liste apenas páginas com avaliações de CLIENTES sobre o produto que você realmente encontrou (Reclame Aqui, B2B Stack, Capterra, G2, GetApp, Google Play, App Store). NÃO inclua Glassdoor, LinkedIn, Indeed ou outras avaliações de funcionários.`;
 }
 
 const urlValida = (u: unknown): u is string => typeof u === "string" && /^https?:\/\/[^\s]+$/i.test(u);
 const normalizarUrl = (u: string) => u.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+
+// Avaliações de funcionários não servem como fonte de avaliação do produto.
+const DOMINIOS_FUNCIONARIOS = /(^|\.)(glassdoor\.[a-z.]+|linkedin\.com|indeed\.[a-z.]+|lovemondays\.com\.br)$/i;
+
+/** Ajustes de URL: Google Play em português (mantém o id do app). */
+function ajustarUrlFonte(url: string) {
+  try {
+    const u = new URL(url);
+    if (DOMINIOS_FUNCIONARIOS.test(u.hostname)) return null;
+    if (u.hostname === "play.google.com" && u.searchParams.get("id")) {
+      return `https://play.google.com/store/apps/details?id=${u.searchParams.get("id")}&hl=pt_BR`;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
 
 export async function pesquisarConcorrente(
   nome: string,
@@ -81,22 +100,25 @@ export async function pesquisarConcorrente(
 
   const campos: SugestaoConcorrente["campos"] = {};
   for (const campo of CAMPOS_SUGERIDOS) {
-    const v = bruto[campo] as { valor?: unknown; fonte?: unknown } | null | undefined;
+    const v = bruto[campo] as { valor?: unknown; fonte?: unknown; obs?: unknown } | null | undefined;
     if (!v || v.valor === null || v.valor === undefined || String(v.valor).trim() === "") continue;
     const valor = String(v.valor).trim();
     if (campo === "site" && !urlValida(valor)) continue;
-    campos[campo] = { valor, fonte: urlValida(v.fonte) ? v.fonte : null };
+    const obs = typeof v.obs === "string" && v.obs.trim() ? v.obs.trim().slice(0, 300) : null;
+    campos[campo] = { valor, fonte: urlValida(v.fonte) ? v.fonte : null, obs };
   }
 
   const vistas = new Set<string>();
   const fontesAvaliacao: SugestaoConcorrente["fontesAvaliacao"] = [];
   for (const f of (Array.isArray(bruto.fontes_avaliacao) ? bruto.fontes_avaliacao : []) as { tipo?: string; url?: unknown }[]) {
     if (!urlValida(f.url) || !f.tipo || !(f.tipo in TIPOS_FONTE)) continue;
-    const chave = normalizarUrl(f.url);
+    const url = ajustarUrlFonte(f.url);
+    if (!url) continue;
+    const chave = normalizarUrl(url);
     if (vistas.has(chave)) continue;
     vistas.add(chave);
     // "confirmada" = a URL apareceu nos resultados reais da busca, não só no texto do modelo.
-    fontesAvaliacao.push({ tipo: f.tipo as TipoFonte, url: f.url, confirmada: citadas.has(chave) });
+    fontesAvaliacao.push({ tipo: f.tipo as TipoFonte, url, confirmada: citadas.has(normalizarUrl(f.url)) });
   }
 
   return { campos, fontesAvaliacao, citacoes, modelo: config.modelo, pesquisadoEm: new Date().toISOString() };
