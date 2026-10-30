@@ -88,7 +88,7 @@ export function MenuLateral({
       <nav
         id="menu-principal"
         aria-label="Menu principal"
-        className={`${aberto ? "block" : "hidden"} bg-marinho px-3 pb-4 text-white md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:py-5`}
+        className={`${aberto ? "block" : "hidden"} bg-marinho px-3 pb-4 text-white md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto md:py-5`}
       >
         <p className="hidden px-3 pb-6 text-lg font-semibold md:block">Radar de Concorrentes</p>
         <ul className="space-y-1">{ITENS.map(renderItem)}</ul>
