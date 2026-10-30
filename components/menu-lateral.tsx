@@ -20,6 +20,7 @@ const ITENS_ADMIN: Item[] = [
   { href: "/admin/fontes", rotulo: "Fontes e coletas", admin: true },
   { href: "/admin/analise", rotulo: "Classificar avaliações", admin: true },
   { href: "/admin/usuarios", rotulo: "Usuários", admin: true },
+  { href: "/admin/configuracoes", rotulo: "Configurações", admin: true },
 ];
 
 export function MenuLateral({

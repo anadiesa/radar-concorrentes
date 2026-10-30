@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { BotaoConfirmar } from "@/components/botao-confirmar";
 import { requireAdmin } from "@/lib/auth";
+import { getOpenRouter } from "@/lib/config";
 import { createClient } from "@/lib/supabase/server";
 import { excluirConcorrente } from "../actions";
 import { FormConcorrente } from "../form-concorrente";
@@ -12,16 +13,17 @@ export default async function EditarConcorrentePage({ params }: { params: Promis
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: concorrente }, { data: dados }] = await Promise.all([
+  const [{ data: concorrente }, { data: dados }, config] = await Promise.all([
     supabase.from("concorrentes").select("id, nome, site, segmento, logo, observacoes, ativo, e_nosso").eq("id", id).maybeSingle(),
     supabase.from("dados_empresa").select("*").eq("concorrente_id", id).maybeSingle(),
+    getOpenRouter(),
   ]);
   if (!concorrente) notFound();
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-6 text-2xl font-semibold text-marinho">Editar {concorrente.nome}</h1>
-      <FormConcorrente concorrente={concorrente} dados={dados} />
+      <FormConcorrente concorrente={concorrente} dados={dados} pesquisaDisponivel={!!config?.modelo} />
 
       {!concorrente.e_nosso && (
         <section className="cartao mt-8 border-laranja" aria-labelledby="titulo-excluir">

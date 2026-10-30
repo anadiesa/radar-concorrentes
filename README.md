@@ -60,7 +60,8 @@ O seed também cria 3 concorrentes fictícios (MesaFácil, ComandaPro, Cardápio
 | `NEXT_PUBLIC_SUPABASE_URL` | navegador e servidor | URL da API do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | navegador e servidor | chave pública; o acesso é protegido por RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | criação de usuários e tarefas agendadas; nunca expor |
-| `ANTHROPIC_API_KEY` | **somente servidor** | opcional; só quando a análise por IA for ligada |
+| `OPENROUTER_API_KEY` | **somente servidor** | opcional; se definida, tem prioridade sobre a chave salva na tela Configurações |
+| `OPENROUTER_MODEL` | **somente servidor** | opcional; modelo usado na pesquisa (ex.: `anthropic/claude-sonnet-5.5`) |
 | `NEXT_PUBLIC_APP_URL` | servidor | base dos links de compartilhamento |
 
 Chaves nunca vão para o código nem para o git (`.env*` está no `.gitignore`, exceto `.env.example`).
@@ -83,6 +84,16 @@ lib/auth.ts              perfil logado, requirePerfil / requireAdmin
 supabase/migrations/     schema, tipos e políticas RLS
 supabase/seed.sql        dados de exemplo
 ```
+
+## Pesquisa automática de concorrentes (OpenRouter)
+
+1. Crie uma chave em [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) e adicione créditos.
+2. Em **Administração → Configurações**, cole a chave e escolha o modelo. A chave é validada antes de ser salva.
+3. Em **Concorrentes → Novo concorrente**, digite o nome e clique em **Pesquisar na web**.
+
+A pesquisa usa o plugin de busca web da OpenRouter e preenche **apenas campos vazios**, mostrando a fonte de cada dado. As páginas de avaliação encontradas podem ser cadastradas como fontes com um clique; as que não apareceram nos resultados reais da busca vêm desmarcadas e sinalizadas.
+
+A chave salva pela tela fica na tabela `configuracoes`, com RLS sem nenhuma política: nenhum usuário (nem admin) a lê pela API; só o servidor, com a service role.
 
 ## Importação de avaliações
 

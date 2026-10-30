@@ -42,6 +42,12 @@ await adm.from("concorrentes").delete().eq("id", n.id);
 const { error: e6 } = await adm.from("concorrentes").insert({ nome: "Outro nosso", e_nosso: true });
 ok(!!e6, "só existe um 'Nosso software'");
 
+// A tabela de configurações (chave da OpenRouter) não pode ser lida nem escrita por ninguém via API.
+const { data: cfgAdm, error: eCfg } = await adm.from("configuracoes").select("*");
+ok(!!eCfg || (cfgAdm?.length ?? 0) === 0, "admin NÃO lê configuracoes pela API");
+const { error: eCfg2 } = await adm.from("configuracoes").insert({ chave: "x", valor: "y" });
+ok(!!eCfg2, "admin NÃO grava configuracoes pela API");
+
 const { count } = await adm.from("avaliacoes").select("*", { count: "exact", head: true });
 const { count: ca } = await adm.from("analises").select("*", { count: "exact", head: true });
 ok(count === 30 && ca === 30, `seed: ${count} avaliações / ${ca} análises`);

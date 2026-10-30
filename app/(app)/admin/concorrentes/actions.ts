@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { ErroOpenRouter } from "@/lib/openrouter";
+import { pesquisarConcorrente, type SugestaoConcorrente } from "@/lib/pesquisa-concorrente";
+import { TIPOS_FONTE } from "@/lib/rotulos";
 import { createClient } from "@/lib/supabase/server";
 
 export type EstadoForm = { erro?: string };
@@ -79,9 +82,57 @@ export async function salvarConcorrente(_: EstadoForm, formData: FormData): Prom
     if (error) return { erro: "Concorrente salvo, mas os dados da empresa falharam: " + error.message };
   }
 
+  // Fontes de avaliação marcadas no painel da pesquisa (ignora as que já existem).
+  const fontesNovas = formData
+    .getAll("fontes_novas")
+    .map((v) => {
+      try {
+        return JSON.parse(String(v)) as { tipo: string; url: string };
+      } catch {
+        return null;
+      }
+    })
+    .filter((f): f is { tipo: string; url: string } => !!f && f.tipo in TIPOS_FONTE && urlValida(f.url) && !!f.url);
+  if (fontesNovas.length > 0) {
+    const { data: existentes } = await supabase.from("fontes").select("url").eq("concorrente_id", concorrenteId!);
+    const ja = new Set(existentes?.map((f) => f.url));
+    const inserir = fontesNovas
+      .filter((f) => !ja.has(f.url))
+      .map((f) => ({ concorrente_id: concorrenteId, tipo: f.tipo, url: f.url }));
+    if (inserir.length > 0) {
+      const { error } = await supabase.from("fontes").insert(inserir);
+      if (error) return { erro: "Concorrente salvo, mas as fontes falharam: " + error.message };
+    }
+  }
+
   revalidatePath("/admin/concorrentes");
+  revalidatePath("/admin/fontes");
   revalidatePath("/painel");
   redirect("/admin/concorrentes?salvo=1");
+}
+
+export type ResultadoPesquisa = { sugestao?: SugestaoConcorrente; erro?: string };
+
+export async function pesquisar(nome: string, site: string | null, segmento: string | null): Promise<ResultadoPesquisa> {
+  await requireAdmin();
+  if (!nome.trim()) return { erro: "Digite o nome do concorrente antes de pesquisar." };
+  if (site && !urlValida(site)) site = null;
+
+  // Sem segmento informado, usa o do nosso software para desambiguar nomes parecidos.
+  if (!segmento) {
+    const supabase = await createClient();
+    const { data } = await supabase.from("concorrentes").select("segmento").eq("e_nosso", true).maybeSingle();
+    segmento = data?.segmento ?? null;
+  }
+
+  try {
+    return { sugestao: await pesquisarConcorrente(nome.trim(), site, segmento) };
+  } catch (e) {
+    if (e instanceof ErroOpenRouter) return { erro: e.message };
+    if ((e as Error).name === "TimeoutError") return { erro: "A pesquisa demorou demais. Tente novamente." };
+    console.error("pesquisa de concorrente", e);
+    return { erro: "Não foi possível concluir a pesquisa. Tente novamente." };
+  }
 }
 
 export async function excluirConcorrente(formData: FormData) {
