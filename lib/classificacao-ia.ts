@@ -48,13 +48,15 @@ async function classificarLote(
   temas: Tema[],
   lote: Avaliacao[],
 ): Promise<{ ok: number; falhas: number; custo: number }> {
-  // ~60 tokens por resultado; folga para o JSON.
+  // Folga generosa: alguns modelos gastam bem mais tokens por palavra em português.
+  // O limite só evita respostas descontroladas; o custo cobrado é o que for de fato gerado.
   const { texto, custoUsd } = await conversar({
     apiKey,
     modelo,
     sistema: instrucoes(temas),
     usuario: montarLote(lote),
-    maxTokens: 150 + lote.length * 120,
+    maxTokens: 400 + lote.length * 300,
+    semRaciocinio: true,
   });
   const { resultados } = extrairJson<{ resultados?: { n?: number; sentimento?: string; temas?: unknown; resumo_curto?: string }[] }>(texto);
 

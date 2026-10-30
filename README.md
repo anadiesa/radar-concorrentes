@@ -104,7 +104,10 @@ Com a OpenRouter configurada, as avaliações importadas são classificadas pela
 | Operação | Custo aproximado |
 |---|---|
 | Pesquisa de um concorrente | US$ 0,03 |
-| Classificação de uma avaliação | US$ 0,0013 (menos com um modelo Haiku) |
+| Classificação de uma avaliação (Sonnet) | US$ 0,0013 |
+| Classificação de uma avaliação (`deepseek/deepseek-v4-flash`, sugerido) | US$ 0,00004 |
+
+Modelos gratuitos (`:free`) também funcionam, mas são compartilhados e costumam recusar por limite de uso (50 requisições/dia com menos de US$ 10 comprados); nos testes de out/2026, todos os testados falharam. Na classificação o raciocínio do modelo é desligado (`reasoning.enabled = false`), senão modelos "que pensam" gastam o limite antes de responder.
 
 Toda chamada envia `max_tokens`. Sem ele, a OpenRouter reserva o custo máximo do modelo e recusa a chamada (402) quando o saldo está baixo. O custo real de cada pesquisa e de cada lote aparece na tela.
 

@@ -57,12 +57,17 @@ export function modeloPadrao(modelos: Modelo[]): string | null {
   return candidatos[0]?.id ?? null;
 }
 
-/** Modelo sugerido para classificação: o Claude Haiku mais recente (rápido e barato). */
+/**
+ * Modelo sugerido para classificação. Testado em out/2026 com avaliações reais de restaurantes:
+ * DeepSeek V4 Flash acertou todas por ~US$ 0,00004/avaliação. Cai no Haiku e depois no modelo de pesquisa.
+ */
 export function modeloPadraoClassificacao(modelos: Modelo[]): string | null {
-  const candidatos = modelos
+  const ids = new Set(modelos.map((m) => m.id));
+  if (ids.has("deepseek/deepseek-v4-flash")) return "deepseek/deepseek-v4-flash";
+  const haiku = modelos
     .filter((m) => m.id.startsWith("anthropic/claude-haiku") && !m.id.includes(":"))
     .sort((a, b) => b.criado - a.criado);
-  return candidatos[0]?.id ?? modeloPadrao(modelos);
+  return haiku[0]?.id ?? modeloPadrao(modelos);
 }
 
 export async function conversar({
@@ -71,6 +76,7 @@ export async function conversar({
   sistema,
   usuario,
   maxTokens,
+  semRaciocinio,
   buscaWeb,
 }: {
   apiKey: string;
@@ -79,6 +85,8 @@ export async function conversar({
   usuario: string;
   /** Limite da resposta. Obrigatório: sem ele a OpenRouter reserva o custo máximo do modelo. */
   maxTokens: number;
+  /** Pede ao modelo para não "pensar" antes (modelos de raciocínio gastam o limite pensando). */
+  semRaciocinio?: boolean;
   buscaWeb?: { maxResultados: number };
 }): Promise<{ texto: string; citacoes: Citacao[]; custoUsd: number | null }> {
   const r = await fetch(`${BASE}/chat/completions`, {
@@ -94,6 +102,7 @@ export async function conversar({
       temperature: 0.2,
       max_tokens: maxTokens,
       usage: { include: true },
+      ...(semRaciocinio ? { reasoning: { enabled: false } } : {}),
       // Busca via Exa (US$ 0,007 por busca, uma busca por chamada). A busca "nativa" do provedor
       // pode fazer várias buscas e encher o contexto, ficando bem mais cara.
       ...(buscaWeb ? { plugins: [{ id: "web", engine: "exa", max_results: buscaWeb.maxResultados }] } : {}),
@@ -103,7 +112,11 @@ export async function conversar({
 
   const json = await r.json();
   if (json.error) throw new ErroOpenRouter(json.error.message ?? "Erro desconhecido da OpenRouter.");
-  const msg = json.choices?.[0]?.message;
+  const escolha = json.choices?.[0];
+  const msg = escolha?.message;
+  if (escolha?.finish_reason === "length" && !String(msg?.content ?? "").trim().endsWith("}")) {
+    throw new ErroOpenRouter(`A resposta do modelo ${modelo} foi cortada antes do fim. Tente outro modelo em Configurações.`);
+  }
   const citacoes: Citacao[] = (msg?.annotations ?? [])
     .filter((a: { type: string }) => a.type === "url_citation")
     .map((a: { url_citation: { url: string; title?: string } }) => ({
