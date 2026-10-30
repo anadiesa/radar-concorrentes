@@ -279,6 +279,7 @@ export function FormConcorrente({
 
           <p className="text-xs text-texto-suave">
             Modelo: {sugestao.modelo} · {sugestao.citacoes.length} página(s) consultada(s)
+            {sugestao.custoUsd !== null && <> · custo desta pesquisa: US$ {sugestao.custoUsd.toFixed(3)}</>}
           </p>
         </section>
       )}

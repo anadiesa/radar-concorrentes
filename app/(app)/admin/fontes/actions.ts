@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { classificarPendentes } from "@/lib/classificacao-ia";
+import { getOpenRouter } from "@/lib/config";
 import {
   importarAvaliacoes,
   LIMITE_LINHAS,
@@ -45,6 +48,7 @@ export type EstadoImportacao = {
   novas?: number;
   duplicadas?: number;
   avisos?: string[];
+  classificandoIa?: boolean;
 };
 
 export async function importar(_: EstadoImportacao, formData: FormData): Promise<EstadoImportacao> {
@@ -86,5 +90,14 @@ export async function importar(_: EstadoImportacao, formData: FormData): Promise
 
   revalidatePath("/admin/fontes");
   revalidatePath("/admin/analise");
-  return { novas: r.novas, duplicadas: r.duplicadas, avisos };
+
+  // Com a IA configurada, classifica as novas depois de responder (o admin não fica esperando).
+  const config = r.novas > 0 ? await getOpenRouter() : null;
+  if (config?.modeloClassificacao) {
+    after(async () => {
+      const resultado = await classificarPendentes({ fonteId: fonte.id, limite: LIMITE_LINHAS });
+      if (resultado.erro) console.error("classificação automática após importação:", resultado.erro);
+    });
+  }
+  return { novas: r.novas, duplicadas: r.duplicadas, avisos, classificandoIa: !!config?.modeloClassificacao };
 }

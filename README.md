@@ -91,9 +91,22 @@ supabase/seed.sql        dados de exemplo
 2. Em **Administração → Configurações**, cole a chave e escolha o modelo. A chave é validada antes de ser salva.
 3. Em **Concorrentes → Novo concorrente**, digite o nome e clique em **Pesquisar na web**.
 
-A pesquisa usa o plugin de busca web da OpenRouter e preenche **apenas campos vazios**, mostrando a fonte de cada dado. As páginas de avaliação encontradas podem ser cadastradas como fontes com um clique; as que não apareceram nos resultados reais da busca vêm desmarcadas e sinalizadas.
+A pesquisa usa o plugin de busca web da OpenRouter com o motor **Exa** (uma busca por pesquisa, até 10 resultados) e preenche **apenas campos vazios**, mostrando a fonte de cada dado. As páginas de avaliação encontradas podem ser cadastradas como fontes com um clique; as que não apareceram nos resultados reais da busca vêm desmarcadas e sinalizadas.
 
 A chave salva pela tela fica na tabela `configuracoes`, com RLS sem nenhuma política: nenhum usuário (nem admin) a lê pela API; só o servidor, com a service role.
+
+### Classificação automática
+
+Com a OpenRouter configurada, as avaliações importadas são classificadas pela IA em segundo plano (lotes de 10). Também há o botão **Classificar pendentes com IA** em *Classificar avaliações*. A IA usa somente os temas da tabela `temas`; nada é reanalisado. As classificações da IA ficam em **Revisar classificações da IA** até um admin confirmar ou corrigir (`analises.revisado_em`).
+
+### Custos medidos (out/2026, `anthropic/claude-sonnet-5.5`)
+
+| Operação | Custo aproximado |
+|---|---|
+| Pesquisa de um concorrente | US$ 0,03 |
+| Classificação de uma avaliação | US$ 0,0013 (menos com um modelo Haiku) |
+
+Toda chamada envia `max_tokens`. Sem ele, a OpenRouter reserva o custo máximo do modelo e recusa a chamada (402) quando o saldo está baixo. O custo real de cada pesquisa e de cada lote aparece na tela.
 
 ## Importação de avaliações
 

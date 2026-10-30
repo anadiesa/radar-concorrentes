@@ -57,19 +57,30 @@ export function modeloPadrao(modelos: Modelo[]): string | null {
   return candidatos[0]?.id ?? null;
 }
 
+/** Modelo sugerido para classificação: o Claude Haiku mais recente (rápido e barato). */
+export function modeloPadraoClassificacao(modelos: Modelo[]): string | null {
+  const candidatos = modelos
+    .filter((m) => m.id.startsWith("anthropic/claude-haiku") && !m.id.includes(":"))
+    .sort((a, b) => b.criado - a.criado);
+  return candidatos[0]?.id ?? modeloPadrao(modelos);
+}
+
 export async function conversar({
   apiKey,
   modelo,
   sistema,
   usuario,
+  maxTokens,
   buscaWeb,
 }: {
   apiKey: string;
   modelo: string;
   sistema: string;
   usuario: string;
+  /** Limite da resposta. Obrigatório: sem ele a OpenRouter reserva o custo máximo do modelo. */
+  maxTokens: number;
   buscaWeb?: { maxResultados: number };
-}): Promise<{ texto: string; citacoes: Citacao[] }> {
+}): Promise<{ texto: string; citacoes: Citacao[]; custoUsd: number | null }> {
   const r = await fetch(`${BASE}/chat/completions`, {
     method: "POST",
     headers: cabecalhos(apiKey),
@@ -81,7 +92,11 @@ export async function conversar({
         { role: "user", content: usuario },
       ],
       temperature: 0.2,
-      ...(buscaWeb ? { plugins: [{ id: "web", max_results: buscaWeb.maxResultados }] } : {}),
+      max_tokens: maxTokens,
+      usage: { include: true },
+      // Busca via Exa (US$ 0,007 por busca, uma busca por chamada). A busca "nativa" do provedor
+      // pode fazer várias buscas e encher o contexto, ficando bem mais cara.
+      ...(buscaWeb ? { plugins: [{ id: "web", engine: "exa", max_results: buscaWeb.maxResultados }] } : {}),
     }),
   });
   if (!r.ok) throw new ErroOpenRouter(mensagemDeErro(r.status, await r.text()));
@@ -96,7 +111,8 @@ export async function conversar({
       titulo: a.url_citation.title ?? a.url_citation.url,
     }));
 
-  return { texto: msg?.content ?? "", citacoes };
+  const custo = json.usage?.cost;
+  return { texto: msg?.content ?? "", citacoes, custoUsd: typeof custo === "number" ? custo : null };
 }
 
 /** Extrai o primeiro objeto JSON de uma resposta (tolera texto ou ```json em volta). */

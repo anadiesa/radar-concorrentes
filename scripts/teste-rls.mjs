@@ -1,5 +1,6 @@
 // Teste rápido das regras de acesso (RLS), do trigger de perfil e da deduplicação.
-// Requer `npx supabase start` com o seed aplicado e o .env.local preenchido.
+// Requer `npx supabase start`, os usuários de teste do seed e o .env.local preenchido.
+// Não depende dos dados de exemplo: cria e apaga o que usa.
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 const env = Object.fromEntries(fs.readFileSync(".env.local","utf8").split("\n").filter(Boolean).map(l=>{const i=l.indexOf("=");return [l.slice(0,i),l.slice(i+1)]}));
@@ -16,7 +17,7 @@ ok((a0?.length ?? 0) === 0, "anônimo não lê concorrentes");
 const vend = novo();
 await vend.auth.signInWithPassword({ email: "vendedor@radar.local", password: "radar123" });
 const { data: c } = await vend.from("concorrentes").select("nome");
-ok(c?.length === 4, `vendedor lê concorrentes (${c?.length})`);
+ok((c?.length ?? 0) > 0, `vendedor lê concorrentes (${c?.length})`);
 const { error: e1 } = await vend.from("concorrentes").insert({ nome: "X" });
 ok(!!e1, "vendedor NÃO cria concorrente");
 const { data: p } = await vend.from("perfis").select("papel").eq("email","vendedor@radar.local").single();
@@ -47,7 +48,3 @@ const { data: cfgAdm, error: eCfg } = await adm.from("configuracoes").select("*"
 ok(!!eCfg || (cfgAdm?.length ?? 0) === 0, "admin NÃO lê configuracoes pela API");
 const { error: eCfg2 } = await adm.from("configuracoes").insert({ chave: "x", valor: "y" });
 ok(!!eCfg2, "admin NÃO grava configuracoes pela API");
-
-const { count } = await adm.from("avaliacoes").select("*", { count: "exact", head: true });
-const { count: ca } = await adm.from("analises").select("*", { count: "exact", head: true });
-ok(count === 30 && ca === 30, `seed: ${count} avaliações / ${ca} análises`);

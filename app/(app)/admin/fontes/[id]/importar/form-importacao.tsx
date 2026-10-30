@@ -19,11 +19,17 @@ export function FormImportacao({ fonteId }: { fonteId: string }) {
             <strong>{estado.novas}</strong> avaliações novas importadas
             {estado.duplicadas ? <>; <strong>{estado.duplicadas}</strong> já existiam e foram ignoradas</> : null}.
           </p>
-          {estado.novas > 0 && (
-            <Link href="/admin/analise" className="mt-2 inline-block font-medium underline">
-              Classificar as avaliações importadas
-            </Link>
-          )}
+          {estado.novas > 0 &&
+            (estado.classificandoIa ? (
+              <p className="mt-2">
+                A IA está classificando as avaliações novas em segundo plano (cerca de 10 segundos a cada 10 avaliações).{" "}
+                <Link href="/admin/analise/revisar" className="font-medium underline">Revisar classificações</Link>
+              </p>
+            ) : (
+              <Link href="/admin/analise" className="mt-2 inline-block font-medium underline">
+                Classificar as avaliações importadas
+              </Link>
+            ))}
         </div>
       )}
       {estado.avisos && estado.avisos.length > 0 && (

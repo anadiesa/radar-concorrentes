@@ -10,6 +10,7 @@ export type SugestaoConcorrente = {
   fontesAvaliacao: { tipo: TipoFonte; url: string; confirmada: boolean }[];
   citacoes: Citacao[];
   modelo: string;
+  custoUsd: number | null;
   pesquisadoEm: string;
 };
 
@@ -34,10 +35,23 @@ Regras:
 - Cuidado com empresas de nomes parecidos: confirme que é o software certo pelo segmento.
 - Não inclua dados pessoais de pessoas físicas.`;
 
-function instrucoes(nome: string, site: string | null, segmento: string | null) {
-  return `Pesquise o software/empresa concorrente "${nome}"${site ? ` (site: ${site})` : ""}${
-    segmento ? `, do segmento "${segmento}"` : ""
-  }.
+// A busca web usa a mensagem do usuário como termo de pesquisa: por isso ela é curta e focada,
+// e o formato da resposta vai junto das regras, na mensagem de sistema.
+function termoDeBusca(nome: string, site: string | null, segmento: string | null) {
+  const dominio = site ? new URL(site).hostname.replace(/^www\./, "") : null;
+  return [
+    `"${nome}"`,
+    segmento ?? "software",
+    dominio,
+    "empresa fundação funcionários investimento",
+    "avaliações Reclame Aqui Capterra Google Play",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function formato(nome: string, site: string | null, segmento: string | null) {
+  return `Empresa pesquisada: "${nome}"${site ? ` (site: ${site})` : ""}${segmento ? `, segmento "${segmento}"` : ""}.
 
 Devolva exatamente este JSON (valores em português do Brasil):
 {
@@ -64,11 +78,14 @@ const normalizarUrl = (u: string) => u.replace(/[?#].*$/, "").replace(/\/+$/, ""
 // Avaliações de funcionários não servem como fonte de avaliação do produto.
 const DOMINIOS_FUNCIONARIOS = /(^|\.)(glassdoor\.[a-z.]+|linkedin\.com|indeed\.[a-z.]+|lovemondays\.com\.br)$/i;
 
-/** Ajustes de URL: Google Play em português (mantém o id do app). */
+/** Ajustes de URL: Reclame Aqui na página principal e Google Play em português. */
 function ajustarUrlFonte(url: string) {
   try {
     const u = new URL(url);
     if (DOMINIOS_FUNCIONARIOS.test(u.hostname)) return null;
+    // Reclame Aqui: sempre a página principal da empresa (não /sobre/, /lista-reclamacoes/ etc.).
+    const ra = u.hostname.endsWith("reclameaqui.com.br") && u.pathname.match(/^\/empresa\/([^/]+)/);
+    if (ra) return `https://www.reclameaqui.com.br/empresa/${ra[1]}/`;
     if (u.hostname === "play.google.com" && u.searchParams.get("id")) {
       return `https://play.google.com/store/apps/details?id=${u.searchParams.get("id")}&hl=pt_BR`;
     }
@@ -87,12 +104,16 @@ export async function pesquisarConcorrente(
   if (!config) throw new ErroOpenRouter("Configure a chave da OpenRouter em Administração → Configurações.");
   if (!config.modelo) throw new ErroOpenRouter("Escolha o modelo de IA em Administração → Configurações.");
 
-  const { texto, citacoes } = await conversar({
+  const { texto, citacoes, custoUsd } = await conversar({
     apiKey: config.apiKey,
     modelo: config.modelo,
-    sistema: SISTEMA,
-    usuario: instrucoes(nome, site, segmento),
-    buscaWeb: { maxResultados: 8 },
+    sistema: `${SISTEMA}
+
+${formato(nome, site, segmento)}`,
+    usuario: termoDeBusca(nome, site, segmento),
+    maxTokens: 2500,
+    // A Exa cobra o mesmo valor por busca até 10 resultados.
+    buscaWeb: { maxResultados: 10 },
   });
 
   const bruto = extrairJson<Record<string, unknown>>(texto);
@@ -121,5 +142,5 @@ export async function pesquisarConcorrente(
     fontesAvaliacao.push({ tipo: f.tipo as TipoFonte, url, confirmada: citadas.has(normalizarUrl(f.url)) });
   }
 
-  return { campos, fontesAvaliacao, citacoes, modelo: config.modelo, pesquisadoEm: new Date().toISOString() };
+  return { campos, fontesAvaliacao, citacoes, modelo: config.modelo, custoUsd, pesquisadoEm: new Date().toISOString() };
 }

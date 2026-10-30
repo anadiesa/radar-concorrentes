@@ -16,12 +16,16 @@ export function FormOpenRouter({
   origem,
   modelo,
   modeloSugerido,
+  modeloClassificacao,
+  modeloClassificacaoSugerido,
   modelos,
 }: {
   chaveMascarada: string | null;
   origem: "ambiente" | "sistema" | null;
   modelo: string | null;
   modeloSugerido: string | null;
+  modeloClassificacao: string | null;
+  modeloClassificacaoSugerido: string | null;
   modelos: { id: string; nome: string }[];
 }) {
   const [estado, acao, pendente] = useActionState<EstadoConfig, FormData>(salvarOpenRouter, {});
@@ -52,7 +56,7 @@ export function FormOpenRouter({
       </div>
 
       <div>
-        <label htmlFor="modelo" className="rotulo">Modelo de IA</label>
+        <label htmlFor="modelo" className="rotulo">Modelo para pesquisa de concorrentes</label>
         <input
           id="modelo"
           name="modelo"
@@ -70,6 +74,23 @@ export function FormOpenRouter({
         <p id="modelo-ajuda" className="mt-1 text-xs text-texto-suave">
           Comece a digitar para ver os {modelos.length} modelos disponíveis.
           {modeloSugerido && <> Sugestão: <code>{modeloSugerido}</code> (bom em português e em seguir o formato pedido).</>}
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="modelo_classificacao" className="rotulo">Modelo para classificar avaliações</label>
+        <input
+          id="modelo_classificacao"
+          name="modelo_classificacao"
+          list="lista-modelos"
+          defaultValue={modeloClassificacao ?? modeloClassificacaoSugerido ?? ""}
+          placeholder="provedor/modelo"
+          className="campo font-mono"
+          aria-describedby="modelo_classificacao-ajuda"
+        />
+        <p id="modelo_classificacao-ajuda" className="mt-1 text-xs text-texto-suave">
+          Tarefa simples e de volume: um modelo menor sai bem mais barato.
+          {modeloClassificacaoSugerido && <> Sugestão: <code>{modeloClassificacaoSugerido}</code>.</>} Em branco, usa o modelo de pesquisa.
         </p>
       </div>
 

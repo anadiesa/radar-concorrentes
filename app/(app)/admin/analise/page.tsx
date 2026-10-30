@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
+import { getOpenRouter } from "@/lib/config";
 import { formatarData, TIPOS_FONTE } from "@/lib/rotulos";
 import { createClient } from "@/lib/supabase/server";
+import { BotaoClassificarIa } from "./botao-classificar-ia";
 import { CartaoClassificacao, type AvaliacaoPendente } from "./cartao-classificacao";
 
 export const metadata = { title: "Classificar avaliações · Radar de Concorrentes" };
@@ -29,10 +31,12 @@ export default async function AnalisePage({
     .limit(POR_PAGINA);
   if (concorrente) consulta = consulta.eq("concorrente_id", concorrente);
 
-  const [{ data, count, error }, { data: temas }, { data: concorrentes }] = await Promise.all([
+  const [{ data, count, error }, { data: temas }, { data: concorrentes }, { count: aRevisar }, config] = await Promise.all([
     consulta,
     supabase.from("temas").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("concorrentes").select("id, nome").order("nome"),
+    supabase.from("analises").select("avaliacao_id", { count: "exact", head: true }).is("revisado_em", null),
+    getOpenRouter(),
   ]);
 
   const pendentes: AvaliacaoPendente[] =
@@ -57,6 +61,15 @@ export default async function AnalisePage({
         </p>
       </div>
 
+      {(aRevisar ?? 0) > 0 && (
+        <p className="rounded-md border border-azul bg-azul-claro px-4 py-3 text-sm text-azul-escuro">
+          {aRevisar} classificação(ões) feitas pela IA aguardando revisão.{" "}
+          <Link href="/admin/analise/revisar" className="font-medium underline">Revisar agora</Link>
+        </p>
+      )}
+
+      {config?.modeloClassificacao && !concorrente && (count ?? 0) > 0 && <BotaoClassificarIa pendentes={count ?? 0} />}
+
       <form className="flex flex-wrap items-end gap-3" aria-label="Filtrar por concorrente">
         <div>
           <label htmlFor="filtro-concorrente" className="rotulo">Concorrente</label>
@@ -72,7 +85,7 @@ export default async function AnalisePage({
 
       {pendentes.length === 0 ? (
         <div className="cartao text-sm">
-          <p>Nada pendente. 🎉</p>
+          <p>Nada pendente de classificação.</p>
           <Link href="/admin/fontes" className="mt-2 inline-block text-azul underline">Importar mais avaliações</Link>
         </div>
       ) : (

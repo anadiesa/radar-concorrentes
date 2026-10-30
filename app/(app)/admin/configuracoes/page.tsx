@@ -1,7 +1,7 @@
 import { BotaoConfirmar } from "@/components/botao-confirmar";
 import { requireAdmin } from "@/lib/auth";
 import { getOpenRouter, mascarar } from "@/lib/config";
-import { listarModelos, modeloPadrao } from "@/lib/openrouter";
+import { listarModelos, modeloPadrao, modeloPadraoClassificacao } from "@/lib/openrouter";
 import { removerChave } from "./actions";
 import { FormOpenRouter } from "./form-openrouter";
 
@@ -20,8 +20,8 @@ export default async function ConfiguracoesPage() {
           <div>
             <h2 id="titulo-ia" className="text-lg font-semibold">Inteligência artificial (OpenRouter)</h2>
             <p className="mt-1 text-sm text-texto-suave">
-              Usada para pesquisar dados dos concorrentes na web. Cada pesquisa custa em geral alguns centavos de dólar
-              (modelo + busca), cobrados nos créditos da sua conta OpenRouter.
+              Usada para pesquisar dados dos concorrentes na web e para classificar avaliações. Os custos saem dos créditos
+              da sua conta OpenRouter, e o custo real de cada pesquisa e de cada lote aparece na tela depois de rodar.
             </p>
           </div>
           <span
@@ -36,6 +36,8 @@ export default async function ConfiguracoesPage() {
           origem={config?.origem ?? null}
           modelo={config?.modelo ?? null}
           modeloSugerido={modeloPadrao(modelos)}
+          modeloClassificacao={config?.modeloClassificacao && config.modeloClassificacao !== config.modelo ? config.modeloClassificacao : null}
+          modeloClassificacaoSugerido={modeloPadraoClassificacao(modelos)}
           modelos={modelos.map(({ id, nome }) => ({ id, nome }))}
         />
 

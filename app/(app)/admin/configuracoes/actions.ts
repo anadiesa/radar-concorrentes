@@ -11,9 +11,12 @@ export async function salvarOpenRouter(_: EstadoConfig, formData: FormData): Pro
   const admin = await requireAdmin();
   const novaChave = String(formData.get("api_key") ?? "").trim();
   const modelo = String(formData.get("modelo") ?? "").trim();
+  const modeloClassificacao = String(formData.get("modelo_classificacao") ?? "").trim();
 
-  if (modelo && !/^[\w.-]+\/[\w.:-]+$/.test(modelo)) {
-    return { erro: 'Modelo inválido. Use o formato "provedor/modelo", ex.: anthropic/claude-sonnet-…' };
+  for (const m of [modelo, modeloClassificacao]) {
+    if (m && !/^[\w.-]+\/[\w.:-]+$/.test(m)) {
+      return { erro: `Modelo "${m}" inválido. Use o formato "provedor/modelo", ex.: anthropic/claude-sonnet-…` };
+    }
   }
 
   // Chave nova é validada na OpenRouter antes de ser gravada.
@@ -30,6 +33,7 @@ export async function salvarOpenRouter(_: EstadoConfig, formData: FormData): Pro
       {
         ...(novaChave ? { [CONFIG.CHAVE_API]: novaChave } : {}),
         [CONFIG.CHAVE_MODELO]: modelo || null,
+        [CONFIG.CHAVE_MODELO_CLASSIFICACAO]: modeloClassificacao || null,
       },
       admin.user_id,
     );
