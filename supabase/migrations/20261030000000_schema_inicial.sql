@@ -121,7 +121,7 @@ create table avaliacoes (
   concorrente_id uuid not null references concorrentes (id) on delete cascade,
   fonte_id uuid not null references fontes (id) on delete cascade,
   data date,
-  nota numeric(3, 1) check (nota is null or (nota >= 0 and nota <= 10)),
+  nota numeric(2, 1) check (nota is null or (nota >= 0 and nota <= 5)), -- 0 a 5 estrelas
   texto_original text not null,
   url_original text,
   autor_cargo text,

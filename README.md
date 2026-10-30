@@ -2,14 +2,16 @@
 
 Ferramenta de inteligência competitiva: reúne avaliações dos softwares concorrentes, classifica com IA os pontos positivos e negativos por tema e transforma isso em battle cards para o time comercial.
 
-Stack: Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Auth) · API do Claude · Recharts.
+Stack: Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Auth) · Recharts. Hospedagem prevista: Cloudflare. Código no GitHub.
+
+A classificação das avaliações é **manual** por enquanto (tela *Classificar avaliações*). A análise por IA pode ser ligada depois sem mudar o banco: toda análise passa por `salvarAnalise()` em `lib/analise.ts`, que registra quem/qual modelo classificou.
 
 ## Status das etapas
 
 | Etapa | Conteúdo | Status |
 |---|---|---|
 | a | Autenticação, papéis, cadastro de concorrentes e usuários | ✅ |
-| b | Importação manual (CSV / colar texto) + análise com IA | pendente |
+| b | Fontes, importação manual (CSV / colar texto) e classificação manual | ✅ (IA adiada) |
 | c | Perfil do concorrente | pendente |
 | d | Painel geral | pendente |
 | e | Comparativo | pendente |
@@ -33,6 +35,15 @@ npm run dev                 # http://localhost:3000
 
 Para recriar o banco do zero (migrations + seed): `npx supabase db reset`.
 
+### Testes
+
+```bash
+npm run teste:rls          # regras de acesso, trigger de perfil, deduplicação
+npm run teste:importacao   # parser de CSV, conversões, importação e análise
+```
+
+Ambos usam o Supabase local com o seed aplicado.
+
 ### Usuários de teste (seed)
 
 | E-mail | Senha | Papel |
@@ -49,7 +60,7 @@ O seed também cria 3 concorrentes fictícios (MesaFácil, ComandaPro, Cardápio
 | `NEXT_PUBLIC_SUPABASE_URL` | navegador e servidor | URL da API do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | navegador e servidor | chave pública; o acesso é protegido por RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | criação de usuários e tarefas agendadas; nunca expor |
-| `ANTHROPIC_API_KEY` | **somente servidor** | análise de avaliações e rascunho de battle card (etapa b) |
+| `ANTHROPIC_API_KEY` | **somente servidor** | opcional; só quando a análise por IA for ligada |
 | `NEXT_PUBLIC_APP_URL` | servidor | base dos links de compartilhamento |
 
 Chaves nunca vão para o código nem para o git (`.env*` está no `.gitignore`, exceto `.env.example`).
@@ -72,6 +83,17 @@ lib/auth.ts              perfil logado, requirePerfil / requireAdmin
 supabase/migrations/     schema, tipos e políticas RLS
 supabase/seed.sql        dados de exemplo
 ```
+
+## Importação de avaliações
+
+Em **Administração → Fontes e coletas**, cadastre a fonte e clique em **Importar**:
+
+- **Colar texto**: uma avaliação por bloco, separadas por uma linha em branco.
+- **CSV** (`;` ou `,`, até 4 MB / 2.000 linhas): coluna `texto` obrigatória; `data` (DD/MM/AAAA ou AAAA-MM-DD), `nota`, `url` e `cargo` opcionais.
+
+Notas são guardadas em **0 a 5 estrelas**; valores entre 5 e 10 são tratados como escala 0–10 e divididos por 2. Não importe nome, e-mail ou telefone dos autores — no máximo cargo/segmento.
+
+Depois, classifique em **Administração → Classificar avaliações** (sentimento, temas e resumo de até 15 palavras). Cada avaliação é classificada uma única vez.
 
 Avaliações duplicadas são barradas no banco: `avaliacoes.hash` é gerado a partir do texto normalizado (minúsculas, espaços colapsados) e há `UNIQUE (fonte_id, hash)`.
 

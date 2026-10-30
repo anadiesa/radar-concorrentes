@@ -21,7 +21,7 @@ const { error: e1 } = await vend.from("concorrentes").insert({ nome: "X" });
 ok(!!e1, "vendedor NÃO cria concorrente");
 const { data: p } = await vend.from("perfis").select("papel").eq("email","vendedor@radar.local").single();
 ok(p?.papel === "vendedor", "perfil do vendedor criado pelo trigger");
-const { error: e2 } = await vend.from("perfis").update({ papel: "admin" }).eq("email","vendedor@radar.local").select();
+await vend.from("perfis").update({ papel: "admin" }).eq("email","vendedor@radar.local").select();
 const { data: p2 } = await vend.from("perfis").select("papel").eq("email","vendedor@radar.local").single();
 ok(p2?.papel === "vendedor", "vendedor NÃO se promove a admin");
 const { data: conc } = await vend.from("concorrentes").select("id").eq("e_nosso", false).limit(1).single();

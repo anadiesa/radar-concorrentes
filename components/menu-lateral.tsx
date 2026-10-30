@@ -17,17 +17,20 @@ const ITENS: Item[] = [
 
 const ITENS_ADMIN: Item[] = [
   { href: "/admin/concorrentes", rotulo: "Concorrentes", admin: true },
-  { href: "/admin/fontes", rotulo: "Fontes e coletas", etapa: "b", admin: true },
+  { href: "/admin/fontes", rotulo: "Fontes e coletas", admin: true },
+  { href: "/admin/analise", rotulo: "Classificar avaliações", admin: true },
   { href: "/admin/usuarios", rotulo: "Usuários", admin: true },
 ];
 
 export function MenuLateral({
   nome,
   papel,
+  pendentes = 0,
   sair,
 }: {
   nome: string;
   papel: Papel;
+  pendentes?: number;
   sair: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -51,9 +54,15 @@ export function MenuLateral({
           href={item.href}
           onClick={() => setAberto(false)}
           aria-current={ativo ? "page" : undefined}
-          className={`block rounded-md px-3 py-2 text-sm ${ativo ? "bg-white/15 font-medium text-white" : "text-white/85 hover:bg-white/10"}`}
+          className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${ativo ? "bg-white/15 font-medium text-white" : "text-white/85 hover:bg-white/10"}`}
         >
           {item.rotulo}
+          {item.href === "/admin/analise" && pendentes > 0 && (
+            <span className="rounded-full bg-laranja px-2 text-xs font-semibold text-white">
+              {pendentes}
+              <span className="sr-only"> pendentes</span>
+            </span>
+          )}
         </Link>
       </li>
     );
