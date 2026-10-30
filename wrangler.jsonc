@@ -1,0 +1,20 @@
+// Configuração do Worker na Cloudflare (Next.js via OpenNext).
+// O "name" precisa ser igual ao nome do Worker no painel da Cloudflare.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "radar-concorrentes",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "radar-concorrentes"
+    }
+  ],
+  "observability": { "enabled": true }
+}

@@ -43,3 +43,9 @@ next-env.d.ts
 
 # Backups do banco local (dados reais; não versionar)
 /backups/
+
+# Cloudflare / OpenNext
+/.open-next/
+/.wrangler/
+.dev.vars*
+cloudflare-env.d.ts
