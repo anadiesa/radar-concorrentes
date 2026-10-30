@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { ErroOpenRouter } from "@/lib/openrouter";
+import { ErroIA } from "@/lib/ia";
 import { pesquisarConcorrente, type SugestaoConcorrente } from "@/lib/pesquisa-concorrente";
 import { TIPOS_FONTE } from "@/lib/rotulos";
 import { createClient } from "@/lib/supabase/server";
@@ -128,7 +128,7 @@ export async function pesquisar(nome: string, site: string | null, segmento: str
   try {
     return { sugestao: await pesquisarConcorrente(nome.trim(), site, segmento) };
   } catch (e) {
-    if (e instanceof ErroOpenRouter) return { erro: e.message };
+    if (e instanceof ErroIA) return { erro: e.message };
     if ((e as Error).name === "TimeoutError") return { erro: "A pesquisa demorou demais. Tente novamente." };
     console.error("pesquisa de concorrente", e);
     return { erro: "Não foi possível concluir a pesquisa. Tente novamente." };

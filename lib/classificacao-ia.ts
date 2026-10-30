@@ -1,7 +1,7 @@
 import "server-only";
 import { salvarAnalise } from "@/lib/analise";
-import { getOpenRouter } from "@/lib/config";
-import { conversar, ErroOpenRouter, extrairJson } from "@/lib/openrouter";
+import { getTarefa } from "@/lib/config";
+import { conversar, ErroIA, extrairJson, type ConfigTarefa } from "@/lib/ia";
 import { SENTIMENTOS, type Sentimento } from "@/lib/rotulos";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -43,16 +43,13 @@ function montarLote(lote: Avaliacao[]) {
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 async function classificarLote(
-  apiKey: string,
-  modelo: string,
+  tarefa: ConfigTarefa,
   temas: Tema[],
   lote: Avaliacao[],
 ): Promise<{ ok: number; falhas: number; custo: number }> {
   // Folga generosa: alguns modelos gastam bem mais tokens por palavra em português.
   // O limite só evita respostas descontroladas; o custo cobrado é o que for de fato gerado.
-  const { texto, custoUsd } = await conversar({
-    apiKey,
-    modelo,
+  const { texto, custoUsd } = await conversar(tarefa, {
     sistema: instrucoes(temas),
     usuario: montarLote(lote),
     maxTokens: 400 + lote.length * 300,
@@ -75,7 +72,7 @@ async function classificarLote(
       supabase,
       avaliacao.id,
       { sentimento: r.sentimento as Sentimento, temas: temaIds, resumo_curto: resumo },
-      modelo,
+      tarefa.provedor === "openrouter" ? tarefa.modelo : `${tarefa.provedor}:${tarefa.modelo}`,
     );
     if (!salvo.erro) ok++;
   }
@@ -90,10 +87,14 @@ export async function classificarPendentes({
   limite = 200,
   fonteId,
 }: { limite?: number; fonteId?: string } = {}): Promise<ResultadoClassificacao> {
-  const config = await getOpenRouter();
-  const modelo = config?.modeloClassificacao;
-  if (!config || !modelo) {
-    return { classificadas: 0, falhas: 0, custoUsd: 0, erro: "Configure a OpenRouter em Administração → Configurações." };
+  const tarefa = await getTarefa("classificacao");
+  if (!tarefa) {
+    return {
+      classificadas: 0,
+      falhas: 0,
+      custoUsd: 0,
+      erro: "Configure o provedor e o modelo da classificação em Administração → Configurações.",
+    };
   }
 
   const supabase = createAdminClient();
@@ -122,7 +123,7 @@ export async function classificarPendentes({
 
   for (let i = 0; i < lotes.length; i += PARALELAS) {
     const rodada = await Promise.allSettled(
-      lotes.slice(i, i + PARALELAS).map((l) => classificarLote(config.apiKey, modelo, temas ?? [], l)),
+      lotes.slice(i, i + PARALELAS).map((l) => classificarLote(tarefa, temas ?? [], l)),
     );
     rodada.forEach((r, j) => {
       if (r.status === "fulfilled") {
@@ -131,12 +132,12 @@ export async function classificarPendentes({
         custoUsd += r.value.custo;
       } else {
         falhas += lotes[i + j].length;
-        ultimoErro = r.reason instanceof ErroOpenRouter ? r.reason.message : "Falha ao classificar um lote.";
-        if (!(r.reason instanceof ErroOpenRouter)) console.error("classificação IA", r.reason);
+        ultimoErro = r.reason instanceof ErroIA ? r.reason.message : "Falha ao classificar um lote.";
+        if (!(r.reason instanceof ErroIA)) console.error("classificação IA", r.reason);
       }
     });
-    // Sem crédito / chave inválida: não adianta continuar.
-    if (ultimoErro && /créditos|inválida|revogada/.test(ultimoErro)) break;
+    // Sem crédito, cota esgotada ou chave inválida: não adianta continuar.
+    if (ultimoErro && /créditos|cota|inválid|revogada|permissão/i.test(ultimoErro)) break;
   }
 
   return { classificadas, falhas, custoUsd, erro: ultimoErro };

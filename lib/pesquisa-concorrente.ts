@@ -1,6 +1,6 @@
 import "server-only";
-import { getOpenRouter } from "@/lib/config";
-import { conversar, ErroOpenRouter, extrairJson, type Citacao } from "@/lib/openrouter";
+import { getTarefa } from "@/lib/config";
+import { conversar, ErroIA, extrairJson, PROVEDORES, type Citacao } from "@/lib/ia";
 import { TIPOS_FONTE, type TipoFonte } from "@/lib/rotulos";
 
 export type CampoPesquisado = { valor: string; fonte: string | null; obs: string | null };
@@ -100,24 +100,31 @@ export async function pesquisarConcorrente(
   site: string | null,
   segmento: string | null,
 ): Promise<SugestaoConcorrente> {
-  const config = await getOpenRouter();
-  if (!config) throw new ErroOpenRouter("Configure a chave da OpenRouter em Administração → Configurações.");
-  if (!config.modelo) throw new ErroOpenRouter("Escolha o modelo de IA em Administração → Configurações.");
+  const tarefa = await getTarefa("pesquisa");
+  if (!tarefa) throw new ErroIA("Configure o provedor e o modelo da pesquisa em Administração → Configurações.");
 
-  const { texto, citacoes, custoUsd } = await conversar({
-    apiKey: config.apiKey,
-    modelo: config.modelo,
+  const { texto, citacoes, custoUsd } = await conversar(tarefa, {
     sistema: `${SISTEMA}
 
 ${formato(nome, site, segmento)}`,
     usuario: termoDeBusca(nome, site, segmento),
     maxTokens: 2500,
-    // A Exa cobra o mesmo valor por busca até 10 resultados.
+    // Na OpenRouter, a Exa cobra o mesmo valor por busca até 10 resultados.
     buscaWeb: { maxResultados: 10 },
   });
 
   const bruto = extrairJson<Record<string, unknown>>(texto);
   const citadas = new Set(citacoes.map((c) => normalizarUrl(c.url)));
+  // Quando a busca devolve links de redirecionamento (Gemini), só dá para confirmar pelo domínio.
+  const dominiosRedirecionados = new Set(citacoes.filter((c) => c.redirecionada).map((c) => c.dominio.toLowerCase()));
+  const confirmada = (url: string) => {
+    if (citadas.has(normalizarUrl(url))) return true;
+    try {
+      return dominiosRedirecionados.has(new URL(url).hostname.replace(/^www\./, "").toLowerCase());
+    } catch {
+      return false;
+    }
+  };
 
   const campos: SugestaoConcorrente["campos"] = {};
   for (const campo of CAMPOS_SUGERIDOS) {
@@ -139,8 +146,15 @@ ${formato(nome, site, segmento)}`,
     if (vistas.has(chave)) continue;
     vistas.add(chave);
     // "confirmada" = a URL apareceu nos resultados reais da busca, não só no texto do modelo.
-    fontesAvaliacao.push({ tipo: f.tipo as TipoFonte, url, confirmada: citadas.has(normalizarUrl(f.url)) });
+    fontesAvaliacao.push({ tipo: f.tipo as TipoFonte, url, confirmada: confirmada(f.url) });
   }
 
-  return { campos, fontesAvaliacao, citacoes, modelo: config.modelo, custoUsd, pesquisadoEm: new Date().toISOString() };
+  return {
+    campos,
+    fontesAvaliacao,
+    citacoes,
+    modelo: `${PROVEDORES[tarefa.provedor].nome} · ${tarefa.modelo}`,
+    custoUsd,
+    pesquisadoEm: new Date().toISOString(),
+  };
 }

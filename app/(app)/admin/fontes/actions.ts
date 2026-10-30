@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { classificarPendentes } from "@/lib/classificacao-ia";
-import { getOpenRouter } from "@/lib/config";
+import { getTarefa } from "@/lib/config";
 import {
   importarAvaliacoes,
   LIMITE_LINHAS,
@@ -92,12 +92,12 @@ export async function importar(_: EstadoImportacao, formData: FormData): Promise
   revalidatePath("/admin/analise");
 
   // Com a IA configurada, classifica as novas depois de responder (o admin não fica esperando).
-  const config = r.novas > 0 ? await getOpenRouter() : null;
-  if (config?.modeloClassificacao) {
+  const classificacao = r.novas > 0 ? await getTarefa("classificacao") : null;
+  if (classificacao) {
     after(async () => {
       const resultado = await classificarPendentes({ fonteId: fonte.id, limite: LIMITE_LINHAS });
       if (resultado.erro) console.error("classificação automática após importação:", resultado.erro);
     });
   }
-  return { novas: r.novas, duplicadas: r.duplicadas, avisos, classificandoIa: !!config?.modeloClassificacao };
+  return { novas: r.novas, duplicadas: r.duplicadas, avisos, classificandoIa: !!classificacao };
 }

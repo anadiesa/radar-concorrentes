@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { getOpenRouter } from "@/lib/config";
+import { getTarefa } from "@/lib/config";
 import { formatarData, TIPOS_FONTE } from "@/lib/rotulos";
 import { createClient } from "@/lib/supabase/server";
 import { BotaoClassificarIa } from "./botao-classificar-ia";
@@ -31,12 +31,12 @@ export default async function AnalisePage({
     .limit(POR_PAGINA);
   if (concorrente) consulta = consulta.eq("concorrente_id", concorrente);
 
-  const [{ data, count, error }, { data: temas }, { data: concorrentes }, { count: aRevisar }, config] = await Promise.all([
+  const [{ data, count, error }, { data: temas }, { data: concorrentes }, { count: aRevisar }, classificacao] = await Promise.all([
     consulta,
     supabase.from("temas").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("concorrentes").select("id, nome").order("nome"),
     supabase.from("analises").select("avaliacao_id", { count: "exact", head: true }).is("revisado_em", null),
-    getOpenRouter(),
+    getTarefa("classificacao"),
   ]);
 
   const pendentes: AvaliacaoPendente[] =
@@ -68,7 +68,7 @@ export default async function AnalisePage({
         </p>
       )}
 
-      {config?.modeloClassificacao && !concorrente && (count ?? 0) > 0 && <BotaoClassificarIa pendentes={count ?? 0} />}
+      {classificacao && !concorrente && (count ?? 0) > 0 && <BotaoClassificarIa pendentes={count ?? 0} />}
 
       <form className="flex flex-wrap items-end gap-3" aria-label="Filtrar por concorrente">
         <div>

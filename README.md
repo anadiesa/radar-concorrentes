@@ -60,8 +60,9 @@ O seed também cria 3 concorrentes fictícios (MesaFácil, ComandaPro, Cardápio
 | `NEXT_PUBLIC_SUPABASE_URL` | navegador e servidor | URL da API do Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | navegador e servidor | chave pública; o acesso é protegido por RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | criação de usuários e tarefas agendadas; nunca expor |
-| `OPENROUTER_API_KEY` | **somente servidor** | opcional; se definida, tem prioridade sobre a chave salva na tela Configurações |
-| `OPENROUTER_MODEL` | **somente servidor** | opcional; modelo usado na pesquisa (ex.: `anthropic/claude-sonnet-5.5`) |
+| `OPENROUTER_API_KEY` | **somente servidor** | opcional; tem prioridade sobre a chave salva na tela Configurações |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | **somente servidor** | opcionais; Workers AI |
+| `GEMINI_API_KEY` | **somente servidor** | opcional; Google Gemini |
 | `NEXT_PUBLIC_APP_URL` | servidor | base dos links de compartilhamento |
 
 Chaves nunca vão para o código nem para o git (`.env*` está no `.gitignore`, exceto `.env.example`).
@@ -85,15 +86,23 @@ supabase/migrations/     schema, tipos e políticas RLS
 supabase/seed.sql        dados de exemplo
 ```
 
-## Pesquisa automática de concorrentes (OpenRouter)
+## Inteligência artificial: provedores e tarefas
 
-1. Crie uma chave em [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) e adicione créditos.
-2. Em **Administração → Configurações**, cole a chave e escolha o modelo. A chave é validada antes de ser salva.
-3. Em **Concorrentes → Novo concorrente**, digite o nome e clique em **Pesquisar na web**.
+Em **Administração → Configurações**, configure um ou mais provedores e escolha qual usar em cada tarefa:
 
-A pesquisa usa o plugin de busca web da OpenRouter com o motor **Exa** (uma busca por pesquisa, até 10 resultados) e preenche **apenas campos vazios**, mostrando a fonte de cada dado. As páginas de avaliação encontradas podem ser cadastradas como fontes com um clique; as que não apareceram nos resultados reais da busca vêm desmarcadas e sinalizadas.
+| Provedor | Pesquisa de concorrentes (busca web) | Classificação | Custo |
+|---|---|---|---|
+| OpenRouter | ✅ (busca Exa) | ✅ | pago por uso, em dólar |
+| Cloudflare Workers AI | — | ✅ | 10.000 neurônios grátis/dia |
+| Google Gemini | ✅ (busca Google) | ✅ | cota gratuita diária; no plano grátis o Google pode usar os textos enviados |
 
-A chave salva pela tela fica na tabela `configuracoes`, com RLS sem nenhuma política: nenhum usuário (nem admin) a lê pela API; só o servidor, com a service role.
+Credenciais são validadas no provedor antes de serem salvas. Variáveis de ambiente têm prioridade sobre a tela: `OPENROUTER_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY`. Código em `lib/ia/` (um adaptador por provedor; `lib/ia/index.ts` despacha).
+
+### Pesquisa de concorrentes
+
+Em **Concorrentes → Novo concorrente**, digite o nome e clique em **Pesquisar na web**. A pesquisa preenche **apenas campos vazios**, mostrando a fonte de cada dado. As páginas de avaliação encontradas podem ser cadastradas como fontes com um clique; as que não apareceram nos resultados reais da busca vêm desmarcadas e sinalizadas (no Gemini, que devolve links de redirecionamento, a confirmação é pelo domínio).
+
+As credenciais ficam na tabela `configuracoes`, com RLS sem nenhuma política: nenhum usuário (nem admin) as lê pela API; só o servidor, com a service role.
 
 ### Classificação automática
 

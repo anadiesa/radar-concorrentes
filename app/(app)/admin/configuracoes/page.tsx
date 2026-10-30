@@ -1,58 +1,67 @@
-import { BotaoConfirmar } from "@/components/botao-confirmar";
 import { requireAdmin } from "@/lib/auth";
-import { getOpenRouter, mascarar } from "@/lib/config";
-import { listarModelos, modeloPadrao, modeloPadraoClassificacao } from "@/lib/openrouter";
-import { removerChave } from "./actions";
-import { FormOpenRouter } from "./form-openrouter";
+import { getConfigIA, mascarar } from "@/lib/config";
+import { catalogo, PROVEDORES, type Provedor } from "@/lib/ia";
+import { CartaoProvedor } from "./cartao-provedor";
+import { FormUso, type OpcaoProvedor } from "./form-uso";
 
 export const metadata = { title: "Configurações · Radar de Concorrentes" };
 
+const ORDEM: Provedor[] = ["openrouter", "cloudflare", "gemini"];
+
 export default async function ConfiguracoesPage() {
   await requireAdmin();
-  const [config, modelos] = await Promise.all([getOpenRouter(), listarModelos()]);
+  const config = await getConfigIA();
+  const cat = await catalogo(config.credenciais);
+  const { credenciais: c } = config;
+
+  const mascaraDe = (p: Provedor) =>
+    p === "cloudflare" ? (c.cloudflare ? mascarar(c.cloudflare.apiToken) : null) : c[p] ? mascarar(c[p]!.apiKey) : null;
+
+  const opcoes: OpcaoProvedor[] = ORDEM.map((p) => ({
+    id: p,
+    nome: PROVEDORES[p].nome,
+    configurado: !!c[p],
+    buscaWeb: PROVEDORES[p].buscaWeb,
+    modelos: (cat[p]?.modelos ?? []).map(({ id, nome }) => ({ id, nome })),
+    sugestao: cat[p]?.sugestao ?? { pesquisa: null, classificacao: null },
+  }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold text-marinho">Configurações</h1>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-marinho">Configurações</h1>
+        <p className="mt-1 text-sm text-texto-suave">
+          Configure um ou mais provedores de IA e escolha qual usar em cada tarefa. O custo real aparece na tela depois de
+          cada pesquisa ou lote de classificação (para provedores que informam custo).
+        </p>
+      </div>
 
-      <section className="cartao space-y-4" aria-labelledby="titulo-ia">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 id="titulo-ia" className="text-lg font-semibold">Inteligência artificial (OpenRouter)</h2>
-            <p className="mt-1 text-sm text-texto-suave">
-              Usada para pesquisar dados dos concorrentes na web e para classificar avaliações. Os custos saem dos créditos
-              da sua conta OpenRouter, e o custo real de cada pesquisa e de cada lote aparece na tela depois de rodar.
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${config ? "bg-azul-claro text-azul-escuro" : "bg-laranja-claro text-laranja"}`}
-          >
-            {config ? "Configurada" : "Não configurada"}
-          </span>
+      <section className="space-y-4" aria-labelledby="titulo-uso">
+        <h2 id="titulo-uso" className="text-lg font-semibold">Qual IA usar em cada tarefa</h2>
+        <div className="cartao">
+          <FormUso opcoes={opcoes} atual={config.tarefas} />
         </div>
+      </section>
 
-        <FormOpenRouter
-          chaveMascarada={config ? mascarar(config.apiKey) : null}
-          origem={config?.origem ?? null}
-          modelo={config?.modelo ?? null}
-          modeloSugerido={modeloPadrao(modelos)}
-          modeloClassificacao={config?.modeloClassificacao && config.modeloClassificacao !== config.modelo ? config.modeloClassificacao : null}
-          modeloClassificacaoSugerido={modeloPadraoClassificacao(modelos)}
-          modelos={modelos.map(({ id, nome }) => ({ id, nome }))}
-        />
-
-        {config?.origem === "sistema" && (
-          <form action={removerChave} className="border-t border-borda pt-4">
-            <BotaoConfirmar className="text-sm text-laranja underline" mensagem="Remover a chave da OpenRouter? A pesquisa automática deixará de funcionar.">
-              Remover chave
-            </BotaoConfirmar>
-          </form>
-        )}
+      <section className="space-y-4" aria-labelledby="titulo-provedores">
+        <h2 id="titulo-provedores" className="text-lg font-semibold">Provedores de IA</h2>
+        {ORDEM.map((p) => (
+          <CartaoProvedor
+            key={p}
+            provedor={p}
+            nome={PROVEDORES[p].nome}
+            descricao={PROVEDORES[p].descricao}
+            configurado={!!c[p]}
+            origem={config.origem[p] ?? null}
+            mascara={mascaraDe(p)}
+            accountId={c.cloudflare?.accountId ?? null}
+          />
+        ))}
       </section>
 
       <p className="text-xs text-texto-suave">
-        A chave fica guardada no servidor, numa tabela que nenhum usuário consegue ler — nem administradores. Ela só é usada
-        pelo servidor para chamar a OpenRouter.
+        Chaves e tokens ficam guardados no servidor, numa tabela que nenhum usuário consegue ler — nem administradores.
+        Só o servidor os usa para chamar os provedores.
       </p>
     </div>
   );

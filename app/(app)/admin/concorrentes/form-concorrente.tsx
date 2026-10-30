@@ -154,11 +154,14 @@ export function FormConcorrente({
         }
       }
       // Páginas consultadas pela busca; se a busca não devolver a lista, usa as fontes de cada campo.
-      const urls = r.sugestao.citacoes.length > 0
-        ? r.sugestao.citacoes.map((c) => c.url)
-        : Object.values(r.sugestao.campos).flatMap((c) => (c.fonte ? [c.fonte] : []));
-      if (!novos.fonte_dados.trim() && urls.length > 0) {
-        const doms = [...new Set(urls.map(dominio))].slice(0, 5);
+      const doms = [
+        ...new Set(
+          r.sugestao.citacoes.length > 0
+            ? r.sugestao.citacoes.map((c) => c.dominio)
+            : Object.values(r.sugestao.campos).flatMap((c) => (c.fonte ? [dominio(c.fonte)] : [])),
+        ),
+      ].slice(0, 5);
+      if (!novos.fonte_dados.trim() && doms.length > 0) {
         novos.fonte_dados = `Pesquisa web em ${new Date().toLocaleDateString("pt-BR")}: ${doms.join(", ")}`;
       }
       setValores(novos);
@@ -279,7 +282,7 @@ export function FormConcorrente({
 
           <p className="text-xs text-texto-suave">
             Modelo: {sugestao.modelo} · {sugestao.citacoes.length} página(s) consultada(s)
-            {sugestao.custoUsd !== null && <> · custo desta pesquisa: US$ {sugestao.custoUsd.toFixed(3)}</>}
+            {sugestao.custoUsd !== null ? <> · custo desta pesquisa: US$ {sugestao.custoUsd.toFixed(3)}</> : <> · sem custo em dólar (cota do provedor)</>}
           </p>
         </section>
       )}
